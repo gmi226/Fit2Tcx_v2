@@ -2,8 +2,8 @@
 Transfer fit major version 2 to tcx
 
 #How to use
-$file_path = /example/fit/123.fit
+ex: $file_path = /example/fit/123.fit
 
-$java -jar Fit2TcxV2.jar 
+$java -jar Fit2TcxV2.jar $file_path
 
 output>> /example/fit/123.tcx
