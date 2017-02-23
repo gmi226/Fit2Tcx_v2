@@ -23,10 +23,8 @@ public class Fit2TcxV2 {
 
     static ArrayList<String> arrayXml = null;
 
-    static String tempSportString = "";
     static String tempFirstTrackTime = "";
     static String tempLapStartTime = "";
-    static String preFieldName = "";
 
     static String[] mArgs;
 
@@ -34,7 +32,7 @@ public class Fit2TcxV2 {
     static FitLap fitLap = null;
     static FitTrack fitTrack = null;
     static FitTrackPoint fitTrackPoint = null;
-	static FitProduct fitProduct = null;
+    static FitProduct fitProduct = null;
 
     public static void main( String[] args ) {
 
@@ -90,7 +88,7 @@ public class Fit2TcxV2 {
         mesgBroadcaster.addListener( (LapMesgListener) listener );
         mesgBroadcaster.addListener( (RecordMesgListener) listener );
         mesgBroadcaster.addListener( (SessionMesgListener) listener );
-		mesgBroadcaster.addListener( (FileIdMesgListener) listener );
+        mesgBroadcaster.addListener( (FileIdMesgListener) listener );
 
         try {
             decode.read( in, mesgBroadcaster, mesgBroadcaster );
@@ -135,10 +133,8 @@ public class Fit2TcxV2 {
         fitTrack = null;
         fitTrackPoint = null;
         arrayXml = null;
-        tempSportString = "";
         tempFirstTrackTime = "";
         tempLapStartTime = "";
-        preFieldName = "";
     }
 
     private static class Listener implements
@@ -146,9 +142,9 @@ public class Fit2TcxV2 {
             LapMesgListener,
             RecordMesgListener,
             SessionMesgListener,
-			FileIdMesgListener {
+            FileIdMesgListener {
 
-		@Override
+        @Override
         public void onMesg( FileIdMesg mesg ) {
 
             if (fitProduct == null) {
@@ -171,7 +167,7 @@ public class Fit2TcxV2 {
                 fitProduct.setProductId(mesg.getNumber().toString());
             }
         }
-			
+
         @Override
         public void onMesg( RecordMesg mesg ) {
 
@@ -320,6 +316,10 @@ public class Fit2TcxV2 {
                         case Fit.TAG_DISTANCE:
                             if (mesg instanceof LapMesg) {
 
+                                if (Double.parseDouble(value) == 0) {
+
+                                    value = fitTrack.getFitTrackPoints().get(fitTrack.getFitTrackPoints().size()-1).getDistanceMeters();
+                                }
                                 fitLap.setDistanceMeters(value);
                             }else {
 
@@ -338,9 +338,30 @@ public class Fit2TcxV2 {
                         default:
                             break;
                     }
-                }
+                }else {
 
-                preFieldName = profileField.getName();
+                    String value = field.getValue().toString();
+                    switch (profileField.getName()) {
+                        case Fit.TAG_RECORD_SPEED:
+
+                            fitTrackPoint.setSpeed(value);
+                            break;
+                        case Fit.TAG_DISTANCE:
+                            if (mesg instanceof RecordMesg) {
+
+                                fitTrackPoint.setDistanceMeters(value);
+                            }
+                            break;
+                        case Fit.TAG_CADENCE:
+                            if (mesg instanceof RecordMesg) {
+
+                                fitTrackPoint.setCadence(value);
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                }
             }
         }
     }
@@ -422,23 +443,17 @@ public class Fit2TcxV2 {
                     lapTriggerMethod = lap.getTriggerMethod();
                     lapFitTrack = lap.getFitTrack();
 
-                    if (lapStartTime != null && lapStartTime != "") {
+                    if (lapStartTime != null && lapStartTime != ""
+                            && lapTotalTimeSeconds != null && lapTotalTimeSeconds != ""
+                            && lapDistanceMeters != null && lapDistanceMeters != "") {
 
                         addIntoXml(SPACE_LAP+"<" + Fit.TAG_LAP + " " + Fit.TAG_LAP_START_TIME + "=\"" + lapStartTime + "\">");
+                        addIntoXml(SPACE_TRACK + "<" + Fit.TAG_LAP_TOTAL_TIME + ">" + lapTotalTimeSeconds + "</" + Fit.TAG_LAP_TOTAL_TIME + ">");
+                        addIntoXml(SPACE_TRACK + "<" + Fit.TAG_DISTANCE + ">" + lapDistanceMeters + "</" + Fit.TAG_DISTANCE + ">");
                     }else {
 
-                        //if lap startTime == "", give up this lap
+                        //if lap startTime, lapTotalTimeSeconds, lapDistanceMeters has issue, give up lap
                         continue;
-                    }
-
-                    if (lapTotalTimeSeconds != null && lapTotalTimeSeconds != "") {
-
-                        addIntoXml(SPACE_TRACK + "<" + Fit.TAG_LAP_TOTAL_TIME + ">" + lapTotalTimeSeconds + "</" + Fit.TAG_LAP_TOTAL_TIME + ">");
-                    }
-
-                    if (lapDistanceMeters != null && lapDistanceMeters != "") {
-
-                        addIntoXml(SPACE_TRACK + "<" + Fit.TAG_DISTANCE + ">" + lapDistanceMeters + "</" + Fit.TAG_DISTANCE + ">");
                     }
 
                     if (lapCalories != null && lapCalories != "") {
@@ -490,6 +505,8 @@ public class Fit2TcxV2 {
                             String trackPointCadence;
                             String trackPointSpeed;
 
+                            String preDistance = null;
+
                             for(FitTrackPoint trackPoint : trackPoints) {
 
                                 trackPointTime = trackPoint.getTime();
@@ -504,10 +521,16 @@ public class Fit2TcxV2 {
                                 if (sportMode.equals("Swimming")) {
 
                                     if (trackPointDistanceMeters == null
-                                            || trackPointAltitudeMeters == "") {
+                                            || trackPointDistanceMeters.equals("")) {
 
                                         continue;
                                     }
+                                    if (preDistance != null
+                                            && preDistance.equals(trackPointDistanceMeters)) {
+
+                                        continue;
+                                    }
+                                    preDistance = trackPointDistanceMeters;
                                 }
 
                                 addIntoXml(SPACE_TRACK_POINT + "<" + Fit.TAG_TRACK_POINT + ">");
@@ -564,10 +587,10 @@ public class Fit2TcxV2 {
                     addIntoXml(SPACE_LAP + "</" + Fit.TAG_LAP + ">");
                 }
             }
-			
-			if (fitProduct != null) {
 
-                addIntoXml(SPACE_ACTIVITY + "<" + Fit.TAG_CREATOR + Fit.TAG_CREATOR_HEADER + ">");
+            if (fitProduct != null) {
+
+                addIntoXml(SPACE_LAP + "<" + Fit.TAG_CREATOR + Fit.TAG_CREATOR_HEADER + ">");
                 String name = fitProduct.getName();
                 String unitId = fitProduct.getUnitId();
                 String productId = fitProduct.getProductId();
@@ -575,30 +598,30 @@ public class Fit2TcxV2 {
                 String versionMinor = fitProduct.getVersionMinor();
                 if (name != null && name != "") {
 
-                    addIntoXml(SPACE_LAP + "<" + Fit.TAG_CREATOR_NAME + ">" + name + "</" + Fit.TAG_CREATOR_NAME + ">");
+                    addIntoXml(SPACE_TRACK + "<" + Fit.TAG_CREATOR_NAME + ">" + name + "</" + Fit.TAG_CREATOR_NAME + ">");
                 }
                 if (unitId != null && unitId != "") {
 
-                    addIntoXml(SPACE_LAP + "<" + Fit.TAG_CREATOR_UNIT_ID + ">" + unitId + "</" + Fit.TAG_CREATOR_UNIT_ID + ">");
+                    addIntoXml(SPACE_TRACK + "<" + Fit.TAG_CREATOR_UNIT_ID + ">" + unitId + "</" + Fit.TAG_CREATOR_UNIT_ID + ">");
                 }
                 if (productId != null && productId != "") {
 
-                    addIntoXml(SPACE_LAP + "<" + Fit.TAG_CREATOR_PRODUCT_ID + ">" + productId + "</" + Fit.TAG_CREATOR_PRODUCT_ID + ">");
+                    addIntoXml(SPACE_TRACK + "<" + Fit.TAG_CREATOR_PRODUCT_ID + ">" + productId + "</" + Fit.TAG_CREATOR_PRODUCT_ID + ">");
                 }
                 if (versionMajor != null || versionMinor != null) {
 
-                    addIntoXml(SPACE_LAP + "<" + Fit.TAG_CREATOR_VERSION + ">");
+                    addIntoXml(SPACE_TRACK + "<" + Fit.TAG_CREATOR_VERSION + ">");
                     if (versionMajor != null && versionMajor != "") {
 
-                        addIntoXml(SPACE_LAP_CONTENT + "<" + Fit.TAG_CREATOR_VERSION_MAJOR + ">" + versionMajor + "</" + Fit.TAG_CREATOR_VERSION_MAJOR + ">");
+                        addIntoXml(SPACE_TRACK_POINT + "<" + Fit.TAG_CREATOR_VERSION_MAJOR + ">" + versionMajor + "</" + Fit.TAG_CREATOR_VERSION_MAJOR + ">");
                     }
                     if (versionMinor != null && versionMinor != "") {
 
-                        addIntoXml(SPACE_LAP_CONTENT + "<" + Fit.TAG_CREATOR_VERSION_MINOR + ">" + versionMinor + "</" + Fit.TAG_CREATOR_VERSION_MINOR + ">");
+                        addIntoXml(SPACE_TRACK_POINT + "<" + Fit.TAG_CREATOR_VERSION_MINOR + ">" + versionMinor + "</" + Fit.TAG_CREATOR_VERSION_MINOR + ">");
                     }
-                    addIntoXml(SPACE_LAP + "</" + Fit.TAG_CREATOR_VERSION + ">");
+                    addIntoXml(SPACE_TRACK + "</" + Fit.TAG_CREATOR_VERSION + ">");
                 }
-                addIntoXml(SPACE_ACTIVITY + "</" + Fit.TAG_CREATOR + ">");
+                addIntoXml(SPACE_LAP + "</" + Fit.TAG_CREATOR + ">");
             }
             addIntoXml(SPACE_ACTIVITY + "</" + Fit.TAG_ACTIVITY + ">");
         }
